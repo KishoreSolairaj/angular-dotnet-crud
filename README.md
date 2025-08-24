@@ -77,7 +77,7 @@ dotnet restore
 dotnet ef database update  # Run EF migrations or use SQL script manually
 dotnet run
 
-### 🔹 2. B3. Frontend Setup (/client)
+### 🔹 3. Frontend Setup (/client)
 cd ../client
 npm install
 ng serve
