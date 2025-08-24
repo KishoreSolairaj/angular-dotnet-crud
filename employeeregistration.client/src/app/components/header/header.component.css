@@ -1,0 +1,48 @@
+.app-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #3f51b5; /* Material Indigo */
+  color: white;
+  padding: 0 16px;
+  height: 64px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  height: 40px;
+  margin-right: 12px;
+}
+
+.app-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: white;
+}
+
+nav {
+  display: flex;
+  gap: 12px;
+}
+
+  nav button {
+    background-color: transparent;
+    border: none;
+    color: white;
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    padding: 8px 12px;
+    border-radius: 4px;
+    background: cornflowerblue;
+  }
+
+    nav button:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+    }

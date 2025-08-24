@@ -1,0 +1,39 @@
+/* Container to center table on the page */
+.table-container {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* Table styling */
+table {
+  width: 80%;
+  min-width: 600px;
+  max-width: 1000px;
+  border-collapse: collapse;
+}
+
+/* Optional: Add spacing between rows */
+.mat-row {
+  height: 48px;
+}
+
+/* Center align text in headers and cells */
+th.mat-header-cell, td.mat-cell {
+  text-align: center;
+}
+
+/* Action buttons spacing */
+.mat-cell button {
+  margin: 0 4px;
+}
+
+/* Add elevation/shadow */
+.mat-elevation-z8 {
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+  border-radius: 4px;
+}
+
+.search-mobile{
+    margin: 0px 20px;
+}
