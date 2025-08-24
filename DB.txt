@@ -1,0 +1,319 @@
+-- Step 1: Create the Database
+CREATE DATABASE EmployeeDB;
+GO
+
+-- Step 2: Use the Database
+USE EmployeeDB;
+GO
+
+-- Step 3: Create Country_Mst Table
+CREATE TABLE Country_Mst (
+    CountryId INT PRIMARY KEY IDENTITY(1,1),
+    CountryName VARCHAR(100) NOT NULL
+);
+GO
+
+-- Step 4: Create State_Mst Table
+CREATE TABLE State_Mst (
+    StateId INT PRIMARY KEY IDENTITY(1,1),
+    StateName VARCHAR(100) NOT NULL,
+    CountryId INT NOT NULL,
+    FOREIGN KEY (CountryId) REFERENCES Country_Mst(CountryId) ON DELETE CASCADE
+);
+GO
+
+-- Step 5: Create Employee_Mst Table
+CREATE TABLE Employee_Mst (
+    EmployeeId INT PRIMARY KEY IDENTITY(1001,1),  -- Starts from 1001
+    EmployeeName VARCHAR(30) NOT NULL,
+    Age INT NOT NULL,
+    MobileNum VARCHAR(10) NOT NULL UNIQUE,
+    Pincode VARCHAR(6) NOT NULL,
+    DOB DATETIME NULL,
+    AddressLine1 VARCHAR(250) NOT NULL,
+    AddressLine2 VARCHAR(250) NULL,
+    StateId INT NOT NULL,
+    CountryId INT NOT NULL,
+    FOREIGN KEY (StateId) REFERENCES State_Mst(StateId),
+    FOREIGN KEY (CountryId) REFERENCES Country_Mst(CountryId)
+);
+GO
+
+
+-- Stored Procedures for Employee Registration System
+
+-- 1. Stored Procedure to Get Next Employee ID
+CREATE PROCEDURE SP_GetNextEmployeeId
+    @NextId INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    SELECT @NextId = ISNULL(MAX(EmployeeId), 1000) + 1
+    FROM Employee_Mst;
+END
+GO
+
+-- 2. Stored Procedure to Check Mobile Number Exists
+CREATE PROCEDURE SP_CheckMobileExists
+    @Mobile VARCHAR(10),
+    @ExcludeEmployeeId INT = NULL,
+    @Exists BIT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    IF @ExcludeEmployeeId IS NULL
+    BEGIN
+        IF EXISTS(SELECT 1 FROM Employee_Mst WHERE MobileNum = @Mobile)
+            SET @Exists = 1;
+        ELSE
+            SET @Exists = 0;
+    END
+    ELSE
+    BEGIN
+        IF EXISTS(SELECT 1 FROM Employee_Mst WHERE MobileNum = @Mobile AND EmployeeId != @ExcludeEmployeeId)
+            SET @Exists = 1;
+        ELSE
+            SET @Exists = 0;
+    END
+END
+GO
+
+-- 3. Stored Procedure to Get Employees with Pagination and Filtering
+CREATE PROCEDURE SP_GetEmployees
+    @Name VARCHAR(30) = NULL,
+    @Mobile VARCHAR(10) = NULL,
+    @Page INT = 1,
+    @PageSize INT = 5,
+    @TotalCount INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @Offset INT = (@Page - 1) * @PageSize;
+    
+    -- Get total count
+    SELECT @TotalCount = COUNT(*)
+    FROM Employee_Mst e
+    INNER JOIN State_Mst s ON e.StateId = s.StateId
+    INNER JOIN Country_Mst c ON e.CountryId = c.CountryId
+    WHERE (@Name IS NULL OR e.EmployeeName LIKE '%' + @Name + '%')
+      AND (@Mobile IS NULL OR e.MobileNum LIKE '%' + @Mobile + '%');
+    
+    -- Get paginated results
+    SELECT 
+        e.EmployeeId,
+        e.EmployeeName,
+        e.Age,
+        e.MobileNum,
+        e.Pincode,
+        e.DOB,
+        e.AddressLine1,
+        e.AddressLine2,
+        e.StateId,
+        e.CountryId,
+        s.StateName,
+        c.CountryName
+    FROM Employee_Mst e
+    INNER JOIN State_Mst s ON e.StateId = s.StateId
+    INNER JOIN Country_Mst c ON e.CountryId = c.CountryId
+    WHERE (@Name IS NULL OR e.EmployeeName LIKE '%' + @Name + '%')
+      AND (@Mobile IS NULL OR e.MobileNum LIKE '%' + @Mobile + '%')
+    ORDER BY e.EmployeeId
+    OFFSET @Offset ROWS
+    FETCH NEXT @PageSize ROWS ONLY;
+END
+GO
+
+-- 4. Stored Procedure to Get Employee by ID
+CREATE PROCEDURE SP_GetEmployeeById
+    @EmployeeId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    SELECT 
+        e.EmployeeId,
+        e.EmployeeName,
+        e.Age,
+        e.MobileNum,
+        e.Pincode,
+        e.DOB,
+        e.AddressLine1,
+        e.AddressLine2,
+        e.StateId,
+        e.CountryId,
+        s.StateName,
+        c.CountryName
+    FROM Employee_Mst e
+    INNER JOIN State_Mst s ON e.StateId = s.StateId
+    INNER JOIN Country_Mst c ON e.CountryId = c.CountryId
+    WHERE e.EmployeeId = @EmployeeId;
+END
+GO
+
+-- 5. Stored Procedure to Create Employee
+CREATE PROCEDURE SP_CreateEmployee
+    @EmployeeName VARCHAR(30),
+    @Age INT,
+    @MobileNum VARCHAR(10),
+    @Pincode VARCHAR(6),
+    @DOB DATETIME = NULL,
+    @AddressLine1 VARCHAR(250),
+    @AddressLine2 VARCHAR(250) = NULL,
+    @StateId INT,
+    @CountryId INT,
+    @EmployeeId INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        
+        -- Check if mobile number already exists
+        IF EXISTS(SELECT 1 FROM Employee_Mst WHERE MobileNum = @MobileNum)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            RAISERROR('Mobile number already exists', 16, 1);
+            RETURN;
+        END
+        
+        -- Validate State and Country relationship
+        IF NOT EXISTS(SELECT 1 FROM State_Mst WHERE StateId = @StateId AND CountryId = @CountryId)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            RAISERROR('Invalid State and Country combination', 16, 1);
+            RETURN;
+        END
+        
+        -- Insert employee
+        INSERT INTO Employee_Mst (EmployeeName, Age, MobileNum, Pincode, DOB, AddressLine1, AddressLine2, StateId, CountryId)
+        VALUES (@EmployeeName, @Age, @MobileNum, @Pincode, @DOB, @AddressLine1, @AddressLine2, @StateId, @CountryId);
+        
+        SET @EmployeeId = SCOPE_IDENTITY();
+        
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+GO
+
+-- 6. Stored Procedure to Update Employee
+CREATE PROCEDURE SP_UpdateEmployee
+    @EmployeeId INT,
+    @EmployeeName VARCHAR(30),
+    @Age INT,
+    @MobileNum VARCHAR(10),
+    @Pincode VARCHAR(6),
+    @DOB DATETIME = NULL,
+    @AddressLine1 VARCHAR(250),
+    @AddressLine2 VARCHAR(250) = NULL,
+    @StateId INT,
+    @CountryId INT,
+    @Success BIT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET @Success = 0;
+    
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        
+        -- Check if employee exists
+        IF NOT EXISTS(SELECT 1 FROM Employee_Mst WHERE EmployeeId = @EmployeeId)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END
+        
+        -- Check if mobile number already exists (excluding current employee)
+        IF EXISTS(SELECT 1 FROM Employee_Mst WHERE MobileNum = @MobileNum AND EmployeeId != @EmployeeId)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            RAISERROR('Mobile number already exists', 16, 1);
+            RETURN;
+        END
+        
+        -- Validate State and Country relationship
+        IF NOT EXISTS(SELECT 1 FROM State_Mst WHERE StateId = @StateId AND CountryId = @CountryId)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            RAISERROR('Invalid State and Country combination', 16, 1);
+            RETURN;
+        END
+        
+        -- Update employee
+        UPDATE Employee_Mst 
+        SET EmployeeName = @EmployeeName,
+            Age = @Age,
+            MobileNum = @MobileNum,
+            Pincode = @Pincode,
+            DOB = @DOB,
+            AddressLine1 = @AddressLine1,
+            AddressLine2 = @AddressLine2,
+            StateId = @StateId,
+            CountryId = @CountryId
+        WHERE EmployeeId = @EmployeeId;
+        
+        SET @Success = 1;
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+GO
+
+-- 7. Stored Procedure to Delete Employee
+CREATE PROCEDURE SP_DeleteEmployee
+    @EmployeeId INT,
+    @Success BIT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET @Success = 0;
+    
+    BEGIN TRY
+        IF EXISTS(SELECT 1 FROM Employee_Mst WHERE EmployeeId = @EmployeeId)
+        BEGIN
+            DELETE FROM Employee_Mst WHERE EmployeeId = @EmployeeId;
+            SET @Success = 1;
+        END
+    END TRY
+    BEGIN CATCH
+        THROW;
+    END CATCH
+END
+GO
+
+-- 8. Stored Procedure to Get Countries
+CREATE PROCEDURE SP_GetCountries
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    SELECT CountryId, CountryName
+    FROM Country_Mst
+    ORDER BY CountryName;
+END
+GO
+
+-- 9. Stored Procedure to Get States by Country
+CREATE PROCEDURE SP_GetStatesByCountry
+    @CountryId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    SELECT StateId, StateName, CountryId
+    FROM State_Mst
+    WHERE CountryId = @CountryId
+    ORDER BY StateName;
+END
+GO
