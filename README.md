@@ -44,7 +44,7 @@ A full-stack employee registration and management system built with **Angular** 
 ---
 
 ##  Project Structure
-
+```
 /employee-crud-angular-dotnet/
 │
 ├── /employeeregistration.client/       <- Angular frontend
@@ -53,7 +53,7 @@ A full-stack employee registration and management system built with **Angular** 
 ├── DB.txt         <- contain Functions and procedure used in DB
 └── .gitignore     <- Root-level .gitignore
 
-
+```
 ---
 
 ## Setup Instructions
